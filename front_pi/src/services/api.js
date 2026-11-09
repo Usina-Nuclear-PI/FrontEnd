@@ -1,20 +1,26 @@
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'http://3.95.239.175:8080';
 
 class ApiService {
   async request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
+    const { headers, ...rest } = options;
 
     try {
       const response = await fetch(url, {
+        ...rest,
         headers: {
           'Content-Type': 'application/json',
-          ...options.headers,
+          ...headers,
         },
-        ...options,
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // DELETE costuma voltar 204 sem corpo
+      if (response.status === 204) {
+        return null;
       }
 
       return await response.json();
@@ -102,10 +108,32 @@ class ApiService {
 
   // Usuários
   async login(email, senha) {
-    return this.request('/usuarios/login', {
+    const response = await fetch(`${API_BASE_URL}/usuarios/login`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, senha }),
     });
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    // 401 = credenciais erradas: não é erro de rede, devolve a mensagem para a tela
+    if (response.status === 401) {
+      return {
+        success: false,
+        message: data?.message || 'Email ou senha inválidos',
+      };
+    }
+
+    if (!response.ok || !data) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return data;
   }
 
   async getUsuarios() {
